@@ -7,6 +7,7 @@ module Eval
     , EvalError(..)
     , runEvalT
     , emptyState
+    , initialState
     ) where
 
 import Syntax
@@ -37,6 +38,8 @@ data EvalError = VariableNotInScope String | TypeMismatch
 data EvalState = EvalState { expressionMap :: [(String, Expr)] }
 
 emptyState = EvalState []
+
+initialState = EvalState
 
 newtype EvalT m a = EvalT { runE :: ExceptT EvalError (StateT EvalState m) a }
     deriving (Functor, Applicative, Monad, MonadState EvalState, MonadError EvalError, MonadIO)

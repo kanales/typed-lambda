@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 092465d61657d5e4673a5220c0386e72318d5b795619d7f6e3569149c80e3e2d
+-- hash: 1daf8df0790848bb0c5967ae990cd7d98eb68ca4ba4934175ce6c645769b43b3
 
 name:           typed-lambda
 version:        0.1.0.0
@@ -45,7 +45,7 @@ library
     , pretty
   default-language: Haskell2010
 
-executable typed-lambda-exe
+executable lambda
   main-is: Main.hs
   other-modules:
       Paths_typed_lambda
