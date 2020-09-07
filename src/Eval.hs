@@ -13,12 +13,25 @@ import Syntax
 
 import Data.List
 import Data.Maybe
+import Control.Applicative
 import Control.Monad
 import Control.Monad.Trans
 import Control.Monad.State
 import Control.Monad.Except
 
-data EvalError = VariableNotInScope String
+primitives :: [(String, Expr)]
+primitives =
+    [ ("add", Prim (\x -> Prim (\y -> Lit $ x + y))) 
+    , ("sub", Prim (\x -> Prim (\y -> Lit $ x - y)))
+    , ("mul", Prim (\x -> Prim (\y -> Lit $ x * y)))
+    , ("mod", Prim (\x -> Prim (\y -> Lit $ x + y)))
+    , ("eq",  Prim (\x -> Prim (\y -> if x == y then true else false)))
+    , ("ne",  Prim (\x -> Prim (\y -> if x /= y then true else false)))
+    ]
+    where true  = Lam "x" (Lam "y" (Var "x"))
+          false = Lam "x" (Lam "y" (Var "y"))
+
+data EvalError = VariableNotInScope String | TypeMismatch
     deriving (Show)
 
 data EvalState = EvalState { expressionMap :: [(String, Expr)] }
@@ -60,10 +73,10 @@ subs key val expr = case expr of
 
 freeVars :: Expr -> [String]
 freeVars e = case e of
-    Lit _ -> []
     Var k -> [k]
     App l r -> freeVars l ++ freeVars r
     Lam arg body -> filter (/= arg) (freeVars body)
+    _ -> []
 
 
 extend :: Monad m => String -> Expr -> EvalT m ()
@@ -74,7 +87,7 @@ extend s e = do
 lookupExpr :: Monad m => String -> EvalT m Expr
 lookupExpr s = do
     env <- gets expressionMap
-    case lookup s env of
+    case lookup s env <|> lookup s primitives of
         Nothing -> throwError (VariableNotInScope s)
         Just r  -> return r
 
@@ -90,6 +103,7 @@ evalApp left right = do
     right <- evalExpr right
     case left of
         Lam k v -> evalExpr $ subs k right v
+        Prim f  -> evalPrim f right
         _       -> return $ App left right
 
 evalExpr :: Monad m => Expr -> EvalT m Expr
@@ -101,6 +115,11 @@ evalExpr e = do
         App l r -> evalApp l r
         _       -> return newE
     
+evalPrim :: Monad m => (Int -> Expr) -> Expr -> EvalT m Expr
+evalPrim f e = case e of
+    Lit x -> return (f x)
+    _     -> throwError TypeMismatch
+
 eval :: Monad m => Stmt -> EvalT m Expr
 eval (Let v x) = do
     extend v x 

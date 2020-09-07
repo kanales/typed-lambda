@@ -18,7 +18,8 @@ data Expr
     | App Expr Expr
     | Lam Name Expr
     | Lit Int
-    deriving (Show, Eq)
+    | Prim (Int -> Expr)
+    --deriving (Show, Eq)
 
 instance Pretty Expr where
     ppr p e = case e of
@@ -34,8 +35,9 @@ instance Pretty Expr where
                 viewBody :: Expr -> Expr
                 viewBody (Lam _ a) = viewBody a
                 viewBody x = x
+        Prim _ -> text "<<primitive>>"
 
 data Stmt
     = Let String Expr
     | Expr Expr
-    deriving (Show)
+    --deriving (Show)
