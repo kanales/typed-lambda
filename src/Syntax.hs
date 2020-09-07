@@ -37,5 +37,5 @@ instance Pretty Expr where
 
 data Stmt
     = Let String Expr
-    | Eval Expr
+    | Expr Expr
     deriving (Show)

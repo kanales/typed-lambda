@@ -2,6 +2,7 @@
 
 Lambda calculus implementation inspired in Stephen Diehl's [Write you a Haskell](http://dev.stephendiehl.com/fun/).
 
-## TODO
+## TODO
 
-- [ ] Add state to interpreter (i.e. make let constructs "do something")
+- [x] Add state to interpreter (i.e. make let constructs "do something")
+- [ ] Add primitives (e.g. addition)

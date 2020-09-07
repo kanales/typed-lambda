@@ -66,4 +66,4 @@ binding = do
     return $ Let id ex
 
 stmt :: Parser Stmt
-stmt = binding <|> (Eval <$> expr)
+stmt = binding <|> (Expr <$> expr)
