@@ -1,6 +1,7 @@
 module Syntax 
     ( Name
     , Expr(..)
+    , Stmt(..)
     ) where
 
 import Pretty
@@ -33,3 +34,8 @@ instance Pretty Expr where
                 viewBody :: Expr -> Expr
                 viewBody (Lam _ a) = viewBody a
                 viewBody x = x
+
+data Stmt
+    = Let String Expr
+    | Eval Expr
+    deriving (Show)

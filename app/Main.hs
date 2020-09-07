@@ -6,9 +6,11 @@ import Control.Monad.Trans
 
 process :: String -> IO ()
 process line = do
-    case parse expr line of
+    case parse stmt line of
         Left err -> print err
-        Right ex -> print $ pp ex
+        Right ex -> case ex of
+            Let i x -> putStrLn $ i <> " = " <> show x
+            Eval  x -> print . pp $ eval x
 
 main :: IO ()
 main = runInputT defaultSettings loop

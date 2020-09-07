@@ -3,6 +3,7 @@ module Parser
     , expr
     , abstraction
     , variable
+    , stmt
     ) where
 
 import           Control.Monad
@@ -30,11 +31,17 @@ identifier :: Parser String
 identifier = ident <* spaces
     where 
         iStart  = letter
-        iLetter = letter <|> oneOf "_'"
+        iLetter = letter <|> digit <|> oneOf "_'"
         ident   = (:) <$> iStart <*> many iLetter
 
 term :: Parser Expr
-term = parens expr <|> variable <|> abstraction
+term = parens expr <|> variable <|> number <|> abstraction
+
+natural :: Parser Integer
+natural = read <$> many1 digit
+
+number :: Parser Expr
+number = (Lit . fromIntegral <$> natural) <* spaces
 
 expr :: Parser Expr
 expr = foldl1 App <$> many1 term
@@ -49,3 +56,14 @@ abstraction = do
     reserved "."
     body <- expr
     return $ foldr Lam body args
+
+binding :: Parser Stmt
+binding = do
+    reserved "let"
+    id <- identifier
+    reserved "="
+    ex <- expr
+    return $ Let id ex
+
+stmt :: Parser Stmt
+stmt = binding <|> (Eval <$> expr)
