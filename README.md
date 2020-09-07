@@ -6,3 +6,4 @@ Lambda calculus implementation inspired in Stephen Diehl's [Write you a Haskell]
 
 - [x] Add state to interpreter (i.e. make let constructs "do something")
 - [ ] Add primitives (e.g. addition)
+- [ ] Introduce types
