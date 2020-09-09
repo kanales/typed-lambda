@@ -4,6 +4,7 @@ module Eval
     , Value(..)
     , Term(..)
     , freeVars
+    , getExpression
     , evalStmt
     , EvalT
     , EvalError(..)
@@ -11,9 +12,10 @@ module Eval
     , emptyState
     , initialState
     , toTerm
-    , EvalState
+    , EvalState(..)
     ) where
 
+import           Check
 import           Pretty
 import           Syntax
 
@@ -76,16 +78,16 @@ shift by term = case term of
     TPrim _    -> term
 
 -- EVAL
-data EvalError = VariableNotInScope String | NotAValue Term | NotAClosure Term
+data EvalError = VariableNotInScope String | NotAValue Term | NotAClosure Term | TypeError TypeError
     deriving (Show)
 
-data EvalState = EvalState { environment :: [(String, Term)], primitives :: [(String, Term)] }
+data EvalState = EvalState { environment :: [(String, (Type, Term))] }
 
 emptyState ::  EvalState
-emptyState   = EvalState { environment = [], primitives = [] }
+emptyState   = EvalState { environment = [] }
 
-initialState ::  [(String, Term)] -> EvalState
-initialState prims = EvalState { environment = [], primitives = prims}
+initialState ::  [(String, (Type, Term))] -> EvalState
+initialState prims = EvalState { environment = prims }
 
 newtype EvalT m a = EvalT { runE :: ExceptT EvalError (StateT EvalState m) a }
     deriving (Functor, Applicative, Monad, MonadState EvalState, MonadError EvalError, MonadIO)
@@ -93,20 +95,22 @@ newtype EvalT m a = EvalT { runE :: ExceptT EvalError (StateT EvalState m) a }
 instance MonadTrans EvalT where
     lift = EvalT . lift . lift
 
+instance MonadCheck m => MonadCheck (EvalT m) where
+    check = lift . check
+
 runEvalT :: Monad m => EvalT m a -> EvalState -> m (Either EvalError a)
 runEvalT e = evalStateT (runExceptT (runE e))
 
-extend :: Monad m => String -> Term -> EvalT m ()
-extend s e = do
+extend :: Monad m => String -> (Type, Term) -> EvalT m ()
+extend s (t,e) = do
     state <- get
     let env = environment state
-    put $ state { environment = (s,e) : env }
+    put $ state { environment = (s,(t,e)) : env }
 
-envLookup :: Monad m => String -> EvalT m Term
-envLookup s = do
+lookupTerm :: Monad m => String -> EvalT m Term
+lookupTerm s = do
     env <- gets environment
-    prim <- gets primitives
-    case lookup s prim <|> lookup s env of
+    case snd <$> lookup s env of
         Nothing -> throwError (VariableNotInScope s)
         Just r  -> return r
 
@@ -118,36 +122,49 @@ eval v = case v of
         left <- eval l
         eval (TApp left r)
     TApp l _            -> throwError $ NotAClosure l
-    TApp l            r -> TApp <$> eval l <*> eval r
     _                   -> return v
 
-toTerm :: Monad m => Expr -> EvalT m Term
-toTerm = toTerm' 0 [] where
-    toTerm' :: Monad m => Int -> [(String, Int)] -> Expr -> EvalT m Term
-    toTerm' d bound v = case v of
-        Var s -> do
-            case lookup s bound of
-                Nothing -> shift d <$> envLookup s
-                Just  p -> return $ TVar p
-        App left right -> do
-            l <- toTerm' d bound left
-            r <- toTerm' d bound right
-            return $ TApp l r
-        Lam arg _ body -> TClosure <$> toTerm' (d+1) ((arg,d) : bound) body
-        Lit lit -> return $ case lit of
-            LInt i  -> TVal (VInt i)
-            LBool b -> TVal (VBool b)
+toTerm :: Monad m => Expr -> EvalT m (Type, Term)
+toTerm e = do
+    env <- gets (types . environment)
+    res <- runCheckT (check e) env
+    ty <- case res of
+        Right t  ->  return t
+        Left  er ->  throwError $ TypeError er
+    t  <- toTerm' 0 [] e
+    return (ty, t)
+    where
+        types :: [(String, (Type, Term))] -> [(String, Type)]
+        types = fmap $ \(x, (ty,te)) -> (x, ty)
 
+        toTerm' :: Monad m => Int -> [(String, Int)] -> Expr -> EvalT m Term
+        toTerm' d bound v = case v of
+            Var s -> do
+                case lookup s bound of
+                    Nothing -> shift d  <$> lookupTerm s
+                    Just  p -> return $ TVar p
+            App left right -> do
+                l <- toTerm' d bound left
+                r <- toTerm' d bound right
+                return $ TApp l r
+            Lam arg _ body -> TClosure <$> toTerm' (d+1) ((arg,d) : bound) body
+            Lit lit -> return $ case lit of
+                LInt i  -> TVal (VInt i)
+                LBool b -> TVal (VBool b)
 
-evalStmt :: Monad m => Stmt -> EvalT m Term
+getExpression :: Stmt -> Expr
+getExpression (Expr e)  = e
+getExpression (Let _ e) = e
+
+evalStmt :: Monad m => Stmt -> EvalT m (Type, Term)
 evalStmt s = case s of
     Let binding e -> do
-        t <- handle e
-        extend binding t
-        return t
-    Expr e -> handle e
-    where
-        handle e = toTerm e >>= eval
+        (ty, te) <- toTerm e
+        extend binding (ty, te)
+        (,) <$> return ty <*> eval te
+    Expr e -> do
+        (ty, te) <- toTerm e
+        (,) <$> return ty <*> eval te
 
 freeVars :: Expr -> [String]
 freeVars e = case e of

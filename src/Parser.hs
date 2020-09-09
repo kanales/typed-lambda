@@ -68,7 +68,7 @@ tatom :: Parser Type
 tatom = tlit <|> parens type'
 
 type' :: Parser Type
-type' = foldl1 TArrow <$> sepBy1 tatom (reserved "->")
+type' = foldr1 TArrow <$> sepBy1 tatom (reserved "->")
 
 abstraction :: Parser Expr
 abstraction = do

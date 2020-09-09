@@ -1,4 +1,4 @@
-module Syntax 
+module Syntax
     ( Name
     , Expr(..)
     , Stmt(..)
@@ -6,7 +6,7 @@ module Syntax
     , Type(..)
     ) where
 
-import Pretty
+import           Pretty
 
 type Name = String
 
@@ -54,7 +54,7 @@ instance Pretty Expr where
 
                 viewBody :: Expr -> Expr
                 viewBody (Lam _ _ a) = viewBody a
-                viewBody x = x
+                viewBody x           = x
         --Prim _ -> text "<<primitive>>"
 
 data Stmt
