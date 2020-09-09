@@ -47,6 +47,6 @@ testSubstitutionLambda = TestCase
 testFreeVars = TestCase
     ( assertEqual "get free vars of (x (\\z. z y))"
         (freeVars input)
-        (["x", "y"])
+        ["x", "y"]
     )
     where input = App (Var "x") (Lam "z" (App (Var "z") (Var "y")))

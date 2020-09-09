@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 1daf8df0790848bb0c5967ae990cd7d98eb68ca4ba4934175ce6c645769b43b3
+-- hash: 1f637d0982aa9563e624b6251f0075612690b3677e77babeee30d9b74e77b305
 
 name:           typed-lambda
 version:        0.1.0.0
@@ -36,6 +36,7 @@ library
       Paths_typed_lambda
   hs-source-dirs:
       src
+  ghc-options: -Wall
   build-depends:
       HUnit
     , base >=4.7 && <5
