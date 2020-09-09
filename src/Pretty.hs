@@ -6,6 +6,9 @@ module Pretty
     , hsep
     , char
     , text
+    , sep
+    , punctuate
+    , Doc
     ) where
 
 import Text.PrettyPrint

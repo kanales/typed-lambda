@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 2937edbc2aaa73106c5e9d465f00dbc2126ede24d1f1fb58facc771ec66d0df2
+-- hash: a8752ad9e8f7d1c3958f476354e987a0df044f1292aedc344db2c59d7ba88e0d
 
 name:           typed-lambda
 version:        0.1.0.0
@@ -32,6 +32,7 @@ library
       Lib
       Parser
       Pretty
+      Prim
       Syntax
   other-modules:
       Paths_typed_lambda
