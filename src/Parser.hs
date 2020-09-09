@@ -93,4 +93,4 @@ binding = do
     return $ Let i e
 
 stmt :: Parser Stmt
-stmt = binding <|> (Expr <$> expr)
+stmt = try binding <|> (Expr <$> expr)

@@ -1,4 +1,5 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE TupleSections              #-}
 module Eval
     ( eval
     , Value(..)
@@ -19,12 +20,8 @@ import           Check
 import           Pretty
 import           Syntax
 
-import           Control.Applicative
 import           Control.Monad.Except
 import           Control.Monad.State
-import           Control.Monad.Trans
-
-import           Debug.Trace
 -- VALUES
 data Value
     = VInt Int
@@ -45,20 +42,22 @@ data Term
 
 instance Show Term where
     showsPrec d t = showParen (d>appPrec) $ case t of
-            TClosure t -> showString "TClosure " . showsPrec (appPrec+1) t
-            TPrim p    -> showString "TPrim (?)"
+            TClosure c -> showString "TClosure " . showsPrec (appPrec+1) c
+            TPrim _    -> showString "TPrim (?)"
             TVal v     -> showString "TVal " . showsPrec (appPrec+1) v
             TVar i     -> showString "TVar "  . showsPrec (appPrec+1) i
             TApp l r   -> showString "TApp " . showsPrec (appPrec+1) l . showChar ' ' . showsPrec (appPrec+1) r
+            --Fix  f     -> showString "fix" . showsPrec (appPrec+1) f
             where appPrec = 10
 
 instance Pretty Term where
     ppr d v = case v of
         TClosure _ -> parensIf (d>0) (text "<<closure>>")
         TPrim    _ -> parensIf (d>0) (text "<<prim>>")
-        TVar v     -> char '$' <> text (show v)
+        TVar x     -> char '$' <> text (show x)
         TApp l r   -> parensIf (d>0) (ppr (d+1) l <+> ppr (d+1) r)
-        TVal v     -> pp v
+        TVal x     -> pp x
+        --Fix  f     -> text "fix" <+> ppr (d+1) f
 
 substitute :: Term -> Term -> Term
 substitute val into = case into of
@@ -68,6 +67,7 @@ substitute val into = case into of
     TVar d     -> TVar (d-1)
     TVal v     -> TVal v
     TPrim _    -> into
+    --Fix   f    -> Fix (substitute val f)
 
 shift :: Int -> Term -> Term
 shift by term = case term of
@@ -76,12 +76,13 @@ shift by term = case term of
     TVar d     -> TVar (d+by)
     TVal v     -> TVal v
     TPrim _    -> term
+    --Fix   f    -> Fix (shift by f)
 
 -- EVAL
 data EvalError = VariableNotInScope String | NotAValue Term | NotAClosure Term | TypeError TypeError
     deriving (Show)
 
-data EvalState = EvalState { environment :: [(String, (Type, Term))] }
+newtype EvalState = EvalState { environment :: [(String, (Type, Term))] }
 
 emptyState ::  EvalState
 emptyState   = EvalState { environment = [] }
@@ -103,9 +104,9 @@ runEvalT e = evalStateT (runExceptT (runE e))
 
 extend :: Monad m => String -> (Type, Term) -> EvalT m ()
 extend s (t,e) = do
-    state <- get
-    let env = environment state
-    put $ state { environment = (s,(t,e)) : env }
+    eState <- get
+    let env = environment eState
+    put $ eState { environment = (s,(t,e)) : env }
 
 lookupTerm :: Monad m => String -> EvalT m Term
 lookupTerm s = do
@@ -124,6 +125,22 @@ eval v = case v of
     TApp l _            -> throwError $ NotAClosure l
     _                   -> return v
 
+
+toTerm' :: Monad m => Int -> [(String, Int)] -> Expr -> EvalT m Term
+toTerm' d bound v = case v of
+    Var s -> do
+        case lookup s bound of
+            Nothing -> shift d  <$> lookupTerm s
+            Just  p -> return $ TVar p
+    App left right -> do
+        l <- toTerm' d bound left
+        r <- toTerm' d bound right
+        return $ TApp l r
+    Lam arg _ body -> TClosure <$> toTerm' (d+1) ((arg,d) : bound) body
+    Lit lit -> return $ case lit of
+        LInt i  -> TVal (VInt i)
+        LBool b -> TVal (VBool b)
+
 toTerm :: Monad m => Expr -> EvalT m (Type, Term)
 toTerm e = do
     env <- gets (types . environment)
@@ -131,26 +148,18 @@ toTerm e = do
     ty <- case res of
         Right t  ->  return t
         Left  er ->  throwError $ TypeError er
+
     t  <- toTerm' 0 [] e
     return (ty, t)
     where
         types :: [(String, (Type, Term))] -> [(String, Type)]
-        types = fmap $ \(x, (ty,te)) -> (x, ty)
+        types = fmap $ \(x, (ty, _)) -> (x, ty)
 
-        toTerm' :: Monad m => Int -> [(String, Int)] -> Expr -> EvalT m Term
-        toTerm' d bound v = case v of
-            Var s -> do
-                case lookup s bound of
-                    Nothing -> shift d  <$> lookupTerm s
-                    Just  p -> return $ TVar p
-            App left right -> do
-                l <- toTerm' d bound left
-                r <- toTerm' d bound right
-                return $ TApp l r
-            Lam arg _ body -> TClosure <$> toTerm' (d+1) ((arg,d) : bound) body
-            Lit lit -> return $ case lit of
-                LInt i  -> TVal (VInt i)
-                LBool b -> TVal (VBool b)
+toTermNamed :: Monad m => String -> Expr -> EvalT m (Type, Term)
+toTermNamed name e = do
+    res <- toTerm e
+    extend name res
+    return res
 
 getExpression :: Stmt -> Expr
 getExpression (Expr e)  = e
@@ -158,13 +167,10 @@ getExpression (Let _ e) = e
 
 evalStmt :: Monad m => Stmt -> EvalT m (Type, Term)
 evalStmt s = case s of
-    Let binding e -> do
-        (ty, te) <- toTerm e
-        extend binding (ty, te)
-        (,) <$> return ty <*> eval te
+    Let binding e -> toTermNamed binding e
     Expr e -> do
         (ty, te) <- toTerm e
-        (,) <$> return ty <*> eval te
+        (ty,) <$> eval te
 
 freeVars :: Expr -> [String]
 freeVars e = case e of
