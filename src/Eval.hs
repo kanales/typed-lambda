@@ -20,15 +20,16 @@ import Control.Monad.Trans
 import Control.Monad.State
 import Control.Monad.Except
 
-import Debug.Trace
 -- VALUES
-newtype Value
+data Value
     = VInt Int
+    | VBool Bool
     deriving (Show)
 
 instance Pretty Value where
     ppr _ v = case v of
-        VInt i -> text (show i)
+        VInt i  -> text (show i)
+        VBool b -> text (show b)
 
 data Term
     = TClosure Term
@@ -40,8 +41,8 @@ data Term
 instance Pretty Term where
     ppr d v = case v of
         TClosure _  -> parensIf (d>0) (text "<<closure>>")
-        TVar i      -> undefined -- text ("$" <> show i)
-        TApp l r    -> undefined -- parensIf (d>0) (ppr (d+1) l <+> ppr (d+1) r)
+        TVar _      -> undefined -- text ("$" <> show i)
+        TApp _ _    -> undefined -- parensIf (d>0) (ppr (d+1) l <+> ppr (d+1) r)
         TVal v      -> pp v
 
 substitute :: Term -> Term -> Term
@@ -115,7 +116,9 @@ toTerm = toTerm' 0 [] where
             r <- toTerm' d bound right
             return $ TApp l r
         Lam arg body -> TClosure <$> toTerm' (d+1) ((arg,d) : bound) body
-        Lit i -> return $ TVal (VInt i)
+        Lit lit -> return $ case lit of
+            LInt i  -> TVal (VInt i)
+            LBool b -> TVal (VBool b)
 
 
 evalStmt :: Monad m => Stmt -> EvalT m Term
@@ -132,48 +135,6 @@ evalStmt s = case s of
                 -- Could not reduce
                 TApp l _ -> throwError $ NotAClosure l
                 other    -> return other
--- eval (Let v x) = do
---     extend v x 
---     env <- gets expressionMap
---     return x
--- eval (Expr e)  = evalExpr e
--- primitives :: [(String, Expr)]
--- primitives =
---     [ ("add", Prim (\x -> Prim (\y -> Lit $ x + y))) 
---     , ("sub", Prim (\x -> Prim (\y -> Lit $ x - y)))
---     , ("mul", Prim (\x -> Prim (\y -> Lit $ x * y)))
---     , ("mod", Prim (\x -> Prim (\y -> Lit $ x + y)))
---     , ("eq",  Prim (\x -> Prim (\y -> if x == y then true else false)))
---     , ("ne",  Prim (\x -> Prim (\y -> if x /= y then true else false)))
---     ]
---     where true  = Lam "x" (Lam "y" (Var "x"))
---           false = Lam "x" (Lam "y" (Var "y"))
-
-
-
--- For a given lambda `Lam y e` return an alpha equivalent
--- lambda `Lam y' e'` such that y is not a free variable of expr
--- standarize :: String -> Expr -> Expr -> Expr
--- standarize y e expr =
---     let fv   = freeVars expr
---         ff x = not $ x `elem` fv
---         free = fromJust $ find ff (y: [y <> show i | i <- [1..]])
---     in Lam free (subs y (Var free) e)
-
--- subs :: String -> Expr -> Expr -> Expr
--- subs key val expr = case expr of
---     Lam arg body | arg /= key -> 
---         let 
---             fv      = freeVars val
---             ff x    = not $ x `elem` fv
---             newArg  = fromJust $ find ff (arg: [arg <> show i | i <- [1..]])
---             newBody = subs arg (Var newArg) body
---         in  Lam newArg (ss newBody)
---     Lam arg body | arg == key -> Lam arg body
---     App left right            -> App (ss left) (ss right)
---     Var arg      | arg == key -> val
---     _                         -> expr
---     where ss = subs key val
 
 freeVars :: Expr -> [String]
 freeVars e = case e of
@@ -181,43 +142,3 @@ freeVars e = case e of
     App l r -> freeVars l ++ freeVars r
     Lam arg body -> filter (/= arg) (freeVars body)
     _ -> []
-
--- performSubs :: Monad m => [String] -> Expr -> EvalT m Expr
--- performSubs [] e = return e
--- performSubs (v:vs) e = do
---     val <- lookupExpr v
---     performSubs vs (subs v val e)
-
--- evalApp :: Monad m => Expr -> Expr -> EvalT m Expr
--- evalApp left right = do
---     left <- evalExpr left
---     right <- evalExpr right
---     case left of
---         Lam k v -> evalExpr $ subs k right v
---         Prim f  -> evalPrim f right
---         _       -> return $ App left right
-
--- evalExpr :: Monad m => Expr -> EvalT m Value
--- evalExpr (Lam arg body)   = undefined
---     where
--- evalExpr (App left right) = undefined
--- evalExpr (Lit i)          = VLit i
--- evalExpr  = do
---     let fvs = nub $ freeVars e
---     newE <- performSubs fvs e
-
---     case newE of
---         App l r -> evalApp l r
---         _       -> return newE
-    
--- evalPrim :: Monad m => (Int -> Expr) -> Expr -> EvalT m Expr
--- evalPrim f e = case e of
---     Lit x -> return (f x)
---     _     -> throwError TypeMismatch
-
--- eval :: Monad m => Stmt -> EvalT m Expr
--- eval (Let v x) = do
---     extend v x 
---     env <- gets expressionMap
---     return x
--- eval (Expr e)  = evalExpr e

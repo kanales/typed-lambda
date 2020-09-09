@@ -35,13 +35,21 @@ identifier = ident <* spaces
         ident   = (:) <$> iStart <*> many iLetter
 
 term :: Parser Expr
-term = parens expr <|> variable <|> number <|> abstraction
+term = parens expr <|> literal <|> variable <|> abstraction
 
 natural :: Parser Integer
 natural = read <$> many1 digit
 
-number :: Parser Expr
-number = (Lit . fromIntegral <$> natural) <* spaces
+boolean :: Parser Bool
+boolean = (true <|> false) <* spaces where
+    true  = True   <$ reserved "True"
+    false = False  <$ reserved "False"
+
+number :: Parser Int
+number = (fromIntegral <$> natural) <* spaces
+
+literal :: Parser Expr
+literal = Lit <$> ((LBool <$> boolean) <|> (LInt <$> number))
 
 expr :: Parser Expr
 expr = foldl1 App <$> many1 term

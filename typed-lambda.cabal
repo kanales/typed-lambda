@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 1f637d0982aa9563e624b6251f0075612690b3677e77babeee30d9b74e77b305
+-- hash: 2937edbc2aaa73106c5e9d465f00dbc2126ede24d1f1fb58facc771ec66d0df2
 
 name:           typed-lambda
 version:        0.1.0.0
@@ -27,6 +27,7 @@ source-repository head
 
 library
   exposed-modules:
+      Check
       Eval
       Lib
       Parser

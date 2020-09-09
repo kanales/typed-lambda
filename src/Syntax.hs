@@ -2,6 +2,7 @@ module Syntax
     ( Name
     , Expr(..)
     , Stmt(..)
+    , Literal(..)
     ) where
 
 import Pretty
@@ -17,7 +18,18 @@ data Expr
     = Var Name
     | App Expr Expr
     | Lam Name Expr
-    | Lit Int
+    | Lit Literal
+    deriving (Show, Eq)
+
+data Literal
+    = LInt Int
+    | LBool Bool
+    deriving (Show, Eq)
+
+data Type
+    = TBool
+    | TInt
+    | TArrow Type Type
     deriving (Show, Eq)
 
 instance Pretty Expr where
